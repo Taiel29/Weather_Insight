@@ -1,7 +1,9 @@
 import requests
-import pandas as pd
+from pymongo import MongoClient
+from datetime import datetime
 
 url = "https://api.open-meteo.com/v1/forecast"
+
 params = {
 	"latitude": -34.608056,
 	"longitude": -58.370278,
@@ -13,15 +15,24 @@ try:
     r = requests.get(url, params=params, timeout=10)
     r.raise_for_status()
     datos = r.json()
+
 except requests.exceptions.RequestException as e:
     print(f"No se pudo obtener el clima: {e}")
     datos = None
 
 if datos:
-    hourly = datos["hourly"]
-    df = pd.DataFrame(hourly)
+    client = MongoClient("mongodb://localhost:27017")
+    db = client["WeatherInsight"]
+    collection = db["weather_raw"]
 
-    df["time"] = pd.to_datetime(df["time"])
-    df = df.dropna()
+    documento = {
+        "fecha_descarga": datetime.now(),
+        "fuente": "Open-Meteo",
+        "datos": datos
+    }
 
-    df.to_csv("observacion.csv", index=False)
+    resultado = collection.insert_one(documento)
+
+    print(f"Documento guardado: {resultado.inserted_id}")
+
+    client.close()
